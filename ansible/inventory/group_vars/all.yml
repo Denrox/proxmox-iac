@@ -1,0 +1,13 @@
+---
+ansible_user: ansible
+ansible_become: true
+ansible_become_method: ansible.builtin.sudo
+
+fleet_network: "192.168.0.0/24"
+
+# Human logins live here; the image only creates `ansible`.
+human_users:
+  - name: admin
+    comment: "Admin"
+    keys:
+      - "ssh-ed25519 AAAA... you@workstation"

@@ -1,0 +1,35 @@
+---
+# Needs a read-only (PVEAuditor) API token in PROXMOX_VE_{HOST,USER,TOKEN_ID,TOKEN_SECRET}.
+plugin: community.proxmox.proxmox
+
+url: "https://{{ lookup('ansible.builtin.env', 'PROXMOX_VE_HOST') | default('192.168.0.155', true) }}:8006"
+user: "{{ lookup('ansible.builtin.env', 'PROXMOX_VE_USER') }}"
+# Bare token name (e.g. `ansible`), not the full user@realm!name id.
+token_id: "{{ lookup('ansible.builtin.env', 'PROXMOX_VE_TOKEN_ID') }}"
+token_secret: "{{ lookup('ansible.builtin.env', 'PROXMOX_VE_TOKEN_SECRET') }}"
+validate_certs: false
+
+want_facts: true
+want_proxmox_nodes_ansible_host: false
+exclude_nodes: true
+
+filters:
+  - "proxmox_status == 'running'"
+
+# A VM tagged `web` in Proxmox lands in the `tag_web` group.
+keyed_groups:
+  - key: proxmox_tags_parsed
+    prefix: tag
+    separator: "_"
+
+compose:
+  # Subnet regex is an env var because compose runs before group_vars load.
+  ansible_host: >-
+    ((proxmox_agent_interfaces | default([]))
+      | rejectattr('name', 'equalto', 'lo')
+      | map(attribute='ip-addresses') | flatten
+      | map('regex_replace', '/.*$', '')
+      | select('match', lookup('ansible.builtin.env', 'FLEET_SUBNET_RE')
+                        | default('^192\.168\.0\.', true))
+      | list | first)
+    | default(proxmox_name, true)

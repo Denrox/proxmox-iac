@@ -1,0 +1,43 @@
+---
+- name: Ensure the apt keyring directory exists
+  ansible.builtin.file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: "0755"
+
+- name: Install the download.docker.com signing key
+  ansible.builtin.get_url:
+    url: http://admin.mirror.intra/api/pubkey/download.docker.com
+    dest: /etc/apt/keyrings/download.docker.com.asc
+    mode: "0644"
+
+- name: Add the Docker repository
+  ansible.builtin.copy:
+    dest: /etc/apt/sources.list.d/docker.list
+    content: |
+      deb [signed-by=/etc/apt/keyrings/download.docker.com.asc] http://mirror.intra/download.docker.com/linux/debian trixie stable
+    mode: "0644"
+  register: docker_repo
+
+- name: Refresh apt after adding the repository
+  ansible.builtin.apt:
+    update_cache: true
+  when: docker_repo is changed
+
+- name: Install Docker
+  ansible.builtin.apt:
+    name: "{{ docker_packages }}"
+    state: present
+
+- name: Ensure Docker is running
+  ansible.builtin.systemd_service:
+    name: docker
+    state: started
+    enabled: true
+
+- name: Grant Docker access
+  ansible.builtin.user:
+    name: "{{ item }}"
+    groups: docker
+    append: true
+  loop: "{{ docker_users }}"

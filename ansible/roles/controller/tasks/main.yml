@@ -1,0 +1,154 @@
+---
+- name: Require the vault secrets
+  ansible.builtin.assert:
+    that:
+      - controller_pg_semaphore_password is defined
+      - controller_pg_tofu_password is defined
+      - controller_semaphore_admin_password is defined
+      - controller_semaphore_access_key_encryption is defined
+    fail_msg: >-
+      Missing controller secrets. Create the vault file first - see
+      inventory/group_vars/tag_controller.yml.example.
+
+- name: Create the controller directory
+  ansible.builtin.file:
+    path: "{{ controller_dir }}"
+    state: directory
+    mode: "0750"
+
+- name: Write the compose file
+  ansible.builtin.template:
+    src: compose.yaml.j2
+    dest: "{{ controller_dir }}/compose.yaml"
+    mode: "0600"
+  notify: Restart the controller stack
+
+- name: Bring the stack up
+  community.docker.docker_compose_v2:
+    project_src: "{{ controller_dir }}"
+    files: [compose.yaml]
+    state: present
+    wait: true
+
+- name: Check whether the OpenTofu role exists
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - -f
+      - "{{ controller_dir }}/compose.yaml"
+      - exec
+      - -T
+      - db
+      - psql
+      - -U
+      - "{{ controller_semaphore_db_user }}"
+      - -d
+      - postgres
+      - -tAc
+      - "SELECT 1 FROM pg_roles WHERE rolname = '{{ controller_tofu_db_user }}'"
+  register: tofu_role
+  changed_when: false
+
+- name: Create the OpenTofu role
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - -f
+      - "{{ controller_dir }}/compose.yaml"
+      - exec
+      - -T
+      - db
+      - psql
+      - -U
+      - "{{ controller_semaphore_db_user }}"
+      - -d
+      - postgres
+      - -v
+      - ON_ERROR_STOP=1
+      - -v
+      - "pw={{ controller_pg_tofu_password }}"
+    # Via stdin, not -c: psql only interpolates :'pw' from stdin. ON_ERROR_STOP makes errors fail.
+    stdin: "CREATE ROLE {{ controller_tofu_db_user }} LOGIN PASSWORD :'pw'"
+  when: tofu_role.stdout | trim != "1"
+  no_log: true
+
+- name: Check whether the OpenTofu database exists
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - -f
+      - "{{ controller_dir }}/compose.yaml"
+      - exec
+      - -T
+      - db
+      - psql
+      - -U
+      - "{{ controller_semaphore_db_user }}"
+      - -d
+      - postgres
+      - -tAc
+      - "SELECT 1 FROM pg_database WHERE datname = '{{ controller_tofu_db }}'"
+  register: tofu_db
+  changed_when: false
+
+- name: Create the OpenTofu database
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - -f
+      - "{{ controller_dir }}/compose.yaml"
+      - exec
+      - -T
+      - db
+      - psql
+      - -U
+      - "{{ controller_semaphore_db_user }}"
+      - -d
+      - postgres
+      - -c
+      - "CREATE DATABASE {{ controller_tofu_db }} OWNER {{ controller_tofu_db_user }}"
+  when: tofu_db.stdout | trim != "1"
+
+- name: Install rsync when the dumps are pushed off-box
+  ansible.builtin.apt:
+    name: rsync
+    state: present
+  when: controller_backup_target | length > 0
+
+- name: Install the backup script
+  ansible.builtin.template:
+    src: backup.sh.j2
+    dest: /usr/local/sbin/controller-backup
+    mode: "0700"
+
+- name: Install the backup units
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: "/etc/systemd/system/{{ item }}"
+    mode: "0644"
+  loop:
+    - controller-backup.service
+    - controller-backup.timer
+  notify: Reload systemd
+
+- name: Enable the backup timer
+  ansible.builtin.systemd_service:
+    name: controller-backup.timer
+    enabled: true
+    state: started
+    daemon_reload: true
+
+# Docker bypasses ufw for published ports; these rules are not the real boundary.
+- name: Allow the fleet to reach Postgres and Semaphore
+  community.general.ufw:
+    rule: allow
+    src: "{{ fleet_network }}"
+    proto: tcp
+    port: "{{ item }}"
+  loop:
+    - "{{ controller_pg_port }}"
+    - "{{ controller_semaphore_port }}"

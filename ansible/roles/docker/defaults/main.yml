@@ -1,0 +1,10 @@
+---
+docker_packages:
+  - docker-ce
+  - docker-ce-cli
+  - containerd.io
+  - docker-buildx-plugin
+  - docker-compose-plugin
+
+# The docker group is root-equivalent.
+docker_users: "{{ human_users | map(attribute='name') | list }}"

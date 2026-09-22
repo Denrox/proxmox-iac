@@ -1,0 +1,79 @@
+---
+- name: NFS server
+  hosts: "{{ nfs_hosts | default('tag_nfs') }}"
+  become: true
+  vars:
+    nfs_share_dir: /home/share/share
+  roles:
+    - common
+  tasks:
+    - name: Require the share password
+      ansible.builtin.assert:
+        that: nfs_share_password is defined
+        fail_msg: "Set nfs_share_password in the vault file for this group."
+
+    - name: Install the NFS server
+      ansible.builtin.apt:
+        name:
+          - nfs-kernel-server
+          - nfs-common
+          - snmpd
+        state: present
+
+    - name: Create the share account
+      ansible.builtin.user:
+        name: share
+        shell: /bin/bash
+        password: "{{ nfs_share_password | password_hash('sha512') }}"
+        create_home: true
+        state: present
+      no_log: true
+
+    - name: Create the share directory
+      ansible.builtin.file:
+        path: "{{ nfs_share_dir }}"
+        state: directory
+        owner: share
+        group: share
+        mode: "0755"
+
+    - name: Export the share
+      ansible.builtin.lineinfile:
+        path: /etc/exports
+        line: "{{ nfs_share_dir }} {{ fleet_network }}(rw,sync,no_subtree_check,no_root_squash)"
+        state: present
+        create: true
+        mode: "0644"
+      notify: Reload the exports
+
+    - name: Configure SNMP
+      ansible.builtin.blockinfile:
+        path: /etc/snmp/snmpd.conf
+        block: |
+          master  agentx
+          agentAddress  udp:161
+          rocommunity intra {{ fleet_network }}
+      notify: Restart snmpd
+
+    - name: Open NFS and SNMP to the fleet
+      community.general.ufw:
+        rule: allow
+        src: "{{ fleet_network }}"
+        proto: "{{ item.proto }}"
+        port: "{{ item.port }}"
+      loop:
+        - { proto: tcp, port: 2049 }
+        - { proto: udp, port: 2049 }
+        - { proto: tcp, port: 111 }
+        - { proto: udp, port: 111 }
+        - { proto: udp, port: 161 }
+
+  handlers:
+    - name: Reload the exports
+      ansible.builtin.command: exportfs -ra
+      changed_when: true
+
+    - name: Restart snmpd
+      ansible.builtin.systemd_service:
+        name: snmpd
+        state: restarted

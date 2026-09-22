@@ -1,0 +1,11 @@
+---
+# The toolbox image and Semaphore's runner both install from this file.
+collections:
+  - name: community.proxmox
+    version: "2.0.0"
+  - name: community.general
+    version: "13.3.0"
+  - name: community.docker
+    version: "5.2.2"
+  - name: ansible.posix
+    version: "2.2.2"

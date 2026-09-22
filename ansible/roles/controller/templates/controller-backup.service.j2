@@ -1,0 +1,8 @@
+[Unit]
+Description=Dump the Semaphore and OpenTofu state databases
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/controller-backup

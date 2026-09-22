@@ -1,0 +1,20 @@
+# OpenTofu
+.terraform/
+.terraform.tfstate.lock.info
+*.tfstate
+*.tfstate.backup
+crash.log
+# Plans hold the cloud-init password hash.
+*.tfplan
+# HOME is /work in the toolbox, so tool files land here.
+.terraform.d/
+.ansible/
+.bash_history
+.cache/
+.ssh/
+# Local, never committed
+.env
+.vault-pass
+*.retry
+# Your encrypted vault; see tag_controller.yml.example
+ansible/inventory/group_vars/tag_controller.yml

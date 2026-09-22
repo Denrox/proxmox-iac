@@ -1,0 +1,10 @@
+[Unit]
+Description=Nightly dump of the Semaphore and OpenTofu state databases
+
+[Timer]
+OnCalendar=daily
+RandomizedDelaySec=15m
+Persistent=true
+
+[Install]
+WantedBy=timers.target

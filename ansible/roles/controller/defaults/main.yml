@@ -1,0 +1,23 @@
+---
+controller_dir: /srv/controller
+
+controller_postgres_image: "postgres:17.11-alpine"
+controller_semaphore_image: "semaphoreui/semaphore:v2.19.9"
+
+controller_pg_port: 5432
+controller_semaphore_port: 3000
+
+controller_semaphore_db: semaphore
+controller_semaphore_db_user: semaphore
+
+controller_tofu_db: tofu_state
+controller_tofu_db_user: tofu
+
+controller_semaphore_admin: admin
+controller_semaphore_admin_email: "admin@example.com"
+
+controller_backup_dir: /var/backups/controller
+controller_backup_keep: 14
+controller_backup_target: ""
+
+# Secrets have no defaults; see inventory/group_vars/tag_controller.yml.example.

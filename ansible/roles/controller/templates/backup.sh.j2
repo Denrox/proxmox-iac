@@ -1,0 +1,22 @@
+#!/bin/sh
+# Managed by Ansible - roles/controller.
+set -eu
+
+dir={{ controller_backup_dir }}
+stamp=$(date +%Y%m%d-%H%M%S)
+mkdir -p "$dir"
+
+for db in {{ controller_semaphore_db }} {{ controller_tofu_db }}; do
+	out="$dir/$db-$stamp.sql.gz"
+	docker compose -f {{ controller_dir }}/compose.yaml exec -T db \
+		pg_dump -U {{ controller_semaphore_db_user }} "$db" | gzip -9 >"$out"
+	chmod 0600 "$out"
+done
+
+find "$dir" -name '*.sql.gz' -mtime +{{ controller_backup_keep }} -delete
+
+{% if controller_backup_target %}
+rsync -a --delete "$dir/" {{ controller_backup_target }}
+{% else %}
+# controller_backup_target is unset; dumps stay on this machine.
+{% endif %}

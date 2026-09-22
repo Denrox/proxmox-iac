@@ -1,0 +1,10 @@
+---
+- name: Restart the controller stack
+  community.docker.docker_compose_v2:
+    project_src: "{{ controller_dir }}"
+    files: [compose.yaml]
+    state: restarted
+
+- name: Reload systemd
+  ansible.builtin.systemd_service:
+    daemon_reload: true

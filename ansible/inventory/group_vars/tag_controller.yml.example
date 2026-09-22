@@ -1,0 +1,12 @@
+---
+# Save as tag_controller.yml with ansible-vault; it applies to VMs by their `controller` tag.
+controller_pg_semaphore_password: "change-me"  # openssl rand -base64 24
+controller_pg_tofu_password: "change-me"  # openssl rand -base64 24
+controller_semaphore_admin_password: "change-me"  # openssl rand -base64 18
+controller_semaphore_access_key_encryption: "change-me-base64-32-bytes"  # head -c32 /dev/urandom | base64
+
+# rsync target for the nightly dumps; empty keeps them on the controller.
+controller_backup_target: ""
+
+# OpenTofu state key (TF_ENCRYPTION). Lose it and the state is unreadable.
+tofu_state_passphrase: "change-me"  # openssl rand -hex 24

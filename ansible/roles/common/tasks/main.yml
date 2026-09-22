@@ -1,0 +1,42 @@
+---
+- name: Refuse to run against anything but Debian 13
+  ansible.builtin.assert:
+    that:
+      - ansible_facts['distribution'] == 'Debian'
+      - ansible_facts['distribution_major_version'] == '13'
+    fail_msg: >-
+      This fleet is Debian 13 built from images/debian. Found
+      {{ ansible_facts['distribution'] }} {{ ansible_facts['distribution_version'] }}.
+
+- name: Install the common packages
+  ansible.builtin.apt:
+    name: "{{ common_packages }}"
+    state: present
+
+- name: Create the human accounts
+  ansible.builtin.user:
+    name: "{{ item.name }}"
+    comment: "{{ item.comment | default(omit) }}"
+    groups: sudo
+    append: true
+    shell: /bin/bash
+    create_home: true
+    state: present
+  loop: "{{ human_users }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Install the human accounts' keys
+  ansible.posix.authorized_key:
+    user: "{{ item.0.name }}"
+    key: "{{ item.1 }}"
+    state: present
+  loop: "{{ human_users | subelements('keys') }}"
+  loop_control:
+    label: "{{ item.0.name }}"
+
+- name: Ensure the periodic trim timer is enabled
+  ansible.builtin.systemd_service:
+    name: fstrim.timer
+    enabled: true
+    state: started

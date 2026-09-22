@@ -1,0 +1,48 @@
+# Managed by Ansible - roles/controller. Local edits are overwritten.
+services:
+  db:
+    image: {{ controller_postgres_image }}
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: {{ controller_semaphore_db_user }}
+      POSTGRES_PASSWORD: {{ controller_pg_semaphore_password }}
+      POSTGRES_DB: {{ controller_semaphore_db }}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    # LAN address only: workstations use it as the OpenTofu backend.
+    ports:
+      - "{{ ansible_default_ipv4.address }}:{{ controller_pg_port }}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U {{ controller_semaphore_db_user }}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  semaphore:
+    image: {{ controller_semaphore_image }}
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      SEMAPHORE_DB_DIALECT: postgres
+      SEMAPHORE_DB_HOST: db
+      SEMAPHORE_DB_PORT: "5432"
+      SEMAPHORE_DB_USER: {{ controller_semaphore_db_user }}
+      SEMAPHORE_DB_PASS: {{ controller_pg_semaphore_password }}
+      SEMAPHORE_DB: {{ controller_semaphore_db }}
+      SEMAPHORE_ADMIN: {{ controller_semaphore_admin }}
+      SEMAPHORE_ADMIN_NAME: {{ controller_semaphore_admin }}
+      SEMAPHORE_ADMIN_EMAIL: {{ controller_semaphore_admin_email }}
+      SEMAPHORE_ADMIN_PASSWORD: {{ controller_semaphore_admin_password }}
+      SEMAPHORE_ACCESS_KEY_ENCRYPTION: {{ controller_semaphore_access_key_encryption }}
+    volumes:
+      - semaphore_data:/var/lib/semaphore
+      - semaphore_config:/etc/semaphore
+    ports:
+      - "{{ ansible_default_ipv4.address }}:{{ controller_semaphore_port }}:3000"
+
+volumes:
+  pgdata:
+  semaphore_data:
+  semaphore_config:

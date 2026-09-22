@@ -1,0 +1,12 @@
+# Build output
+dist/*
+!dist/.gitkeep
+
+# Local build scratch
+.build/
+*.tmp
+
+# Never commit real key material or per-VM secrets
+files/keys/*.asc
+!files/keys/.gitkeep
+*.local.conf

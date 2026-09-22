@@ -1,0 +1,24 @@
+---
+- name: Web server
+  hosts: "{{ web_hosts | default('tag_web') }}"
+  become: true
+  roles:
+    - common
+    - docker
+  tasks:
+    - name: Install the web tooling
+      ansible.builtin.apt:
+        name:
+          - apache2-utils
+          - build-essential
+        state: present
+
+    - name: Open HTTP and HTTPS to the fleet
+      community.general.ufw:
+        rule: allow
+        src: "{{ fleet_network }}"
+        proto: tcp
+        port: "{{ item }}"
+      loop:
+        - 80
+        - 443

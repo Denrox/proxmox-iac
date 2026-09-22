@@ -1,0 +1,9 @@
+---
+# No resolvconf: it would overwrite the image's /etc/resolv.conf and break DNS.
+common_packages:
+  - iputils-ping
+  - dmidecode
+  - net-tools
+  - htop
+  - lshw
+  - sshfs

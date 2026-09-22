@@ -1,0 +1,9 @@
+---
+# First run is by hand before tags exist: -e controller_hosts=ctrl
+- name: Controller - OpenTofu state backend and Semaphore
+  hosts: "{{ controller_hosts | default('tag_controller') }}"
+  become: true
+  roles:
+    - common
+    - docker
+    - controller
