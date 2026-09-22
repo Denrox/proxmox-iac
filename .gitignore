@@ -18,3 +18,6 @@ crash.log
 *.retry
 # Your encrypted vault; see tag_controller.yml.example
 ansible/inventory/group_vars/tag_controller.yml
+# Per-workstation values; see the .example next to each
+tofu/environments/intra/local.auto.tfvars
+ansible/inventory/group_vars/all/local.yml

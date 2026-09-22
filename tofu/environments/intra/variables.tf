@@ -42,7 +42,4 @@ variable "installer_file_id" {
 variable "ssh_keys" {
   description = "Public keys for ciuser on every VM."
   type        = list(string)
-  default = [
-    "ssh-ed25519 AAAA... you@workstation",
-  ]
 }

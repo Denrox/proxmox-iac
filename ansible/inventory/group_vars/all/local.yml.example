@@ -1,0 +1,9 @@
+---
+# Copy to local.yml (git-ignored). The image only creates `ansible`; human logins come from here.
+human_users:
+  - name: admin
+    comment: "Admin"
+    keys:
+      - "ssh-ed25519 AAAA... you@workstation"
+
+controller_semaphore_admin_email: "admin@example.com"

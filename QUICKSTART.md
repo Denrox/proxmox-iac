@@ -36,9 +36,9 @@ ssh-keygen -t ed25519 -C "$(whoami)@$(hostname)"      # if there is no key yet
 eval "$(ssh-agent)" && ssh-add ~/.ssh/id_ed25519
 ```
 
-Add the public half to `ssh_keys` in `tofu/environments/intra/variables.tf` and
-to `human_users` in `ansible/inventory/group_vars/all.yml` - one entry per
-workstation.
+Add the public half to `tofu/environments/intra/local.auto.tfvars` and
+`ansible/inventory/group_vars/all/local.yml`. Both are git-ignored; copy them
+from the `.example` next to each. One key per workstation.
 
 **Find `<node>` and the storage ids.** Nothing here can guess them:
 
