@@ -19,7 +19,7 @@ SSH_PORT=22
 FIREWALL=ufw
 FIREWALL_ALLOW=""
 APT_UPGRADE=no
-MIRROR_KEY_URL_BASE=http://admin.mirror.intra/api/pubkey
+MIRROR_KEY_URL_BASE=''
 
 # shellcheck disable=SC1090
 # shellcheck disable=SC1091
@@ -27,6 +27,8 @@ MIRROR_KEY_URL_BASE=http://admin.mirror.intra/api/pubkey
 
 KEYS=/tmp/autoinstall/keys
 PAYLOAD=/tmp/autoinstall/iso
+# shellcheck disable=SC1091
+[ -f "$PAYLOAD/mirror.env" ] && . "$PAYLOAD/mirror.env"
 
 mkdir -p /target/etc/apt/keyrings
 
@@ -59,7 +61,7 @@ rm -f /target/etc/apt/sources.list.d/debian-security.sources
 if [ -f "$PAYLOAD/apt/sources.list" ]; then
 	cp "$PAYLOAD/apt/sources.list" /target/etc/apt/sources.list
 	chmod 0644 /target/etc/apt/sources.list
-	ai_log "wrote /etc/apt/sources.list (internal mirror)"
+	ai_log "wrote /etc/apt/sources.list"
 fi
 
 if in-target apt-get update; then

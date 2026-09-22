@@ -26,14 +26,14 @@ image:
 
 # No -it here, so it also runs from scripts without a terminal.
 iso:
-	@[ -n "$(BASE)" ] || { echo 'usage: make iso BASE=<debian-netinst.iso> [EXTRA=--fetch-keys]'; exit 1; }
+	@[ -n "$(BASE)" ] || { echo 'usage: make iso BASE=<debian-netinst.iso> [MIRROR=<host> EXTRA=--fetch-keys]'; exit 1; }
 	@base=$$(eval printf '%s' "$(BASE)"); \
 	[ -f "$$base" ] || { echo "no such file: $$base"; exit 1; }; \
 	docker run --rm -u "$$(id -u):$$(id -g)" \
 		-v "$(CURDIR):/work" \
 		-v "$$(cd -- "$$(dirname -- "$$base")" && pwd):/base:ro" \
 		$(IMAGE) images/debian/build-image.sh build \
-			--base "/base/$$(basename -- "$$base")" $(EXTRA)
+			--base "/base/$$(basename -- "$$base")" $(if $(MIRROR),--mirror $(MIRROR)) $(EXTRA)
 
 # apply refuses a dirty or out-of-date checkout; plan does not.
 guard:

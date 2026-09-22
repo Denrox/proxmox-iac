@@ -2,17 +2,29 @@
 
 Fill in `<node>`, `<vmid>`, `<uuid>`, `<secret>`, `<pw>`, `<pass>`.
 
+The commands use my network. Replace these values with yours:
+
+| Value here | What it is | Also set in |
+| --- | --- | --- |
+| `192.168.0.155` | Proxmox node address | `ansible/inventory/proxmox.yml` default |
+| `pve-test` | Proxmox node name | `tofu/environments/intra/fleet.auto.tfvars` |
+| `192.168.0.156` | the controller VM | `PG_CONN_STR` below |
+| `192.168.0.1` | gateway and DNS | `gateway`, `nameserver` in `tofu/environments/intra/variables.tf` |
+| `192.168.0.0/24` | the fleet subnet | `fleet_network` in `ansible/inventory/group_vars/all/main.yml`, `FLEET_SUBNET_RE` |
+| `.158`-`.160`, vmids 101, 103, 104 | the fleet | `tofu/environments/intra/fleet.auto.tfvars` |
+
 ### 0. Prerequisites
 
 Three things the steps below assume and none of them announce. Each one fails
 late and unhelpfully if it is missing.
 
-**Give the API token its rights.** A token created through the UI defaults to
-privsep-on with *no* rights, even when its user is `root@pam`: every list comes
-back empty and every write returns 403. `GET /access/permissions` returning
-`{}` is the tell. On the node:
+**Create an API token and give it rights.** A new token has privsep on and
+*no* rights, even when its user is `root@pam`: every list comes back empty and
+every write returns 403. `GET /access/permissions` returning `{}` is the tell.
+On the node (`token add` prints the secret once):
 
 ```bash
+pveum user token add root@pam <id> --privsep 1
 pveum acl modify / --tokens 'root@pam!<id>' \
     --roles PVEVMAdmin,PVEDatastoreUser,PVEAuditor
 # attaching a NIC to vmbr0 counts as using the "localnetwork" SDN zone, and
@@ -51,18 +63,23 @@ api /nodes/<node>/network               # --bridge
 ./scripts/pve-scan.sh                   # vmids already taken
 ```
 
-### 1. Build the toolbox
+### 1. Build the toolbox and the installer ISO
 
 ```bash
 make image
+curl -fLO https://cdimage.debian.org/cdimage/archive/13.6.0/amd64/iso-cd/debian-13.6.0-amd64-netinst.iso
+make iso BASE=debian-13.6.0-amd64-netinst.iso
 ```
+
+The ISO installs from deb.debian.org. For your own re-signing mirror, laid out
+as `http://<host>/deb.debian.org/debian`, add `MIRROR=<host> EXTRA=--fetch-keys`.
 
 ### 2. Provision the controller VM
 
 ```bash
 ./scripts/pve-provision.sh --insecure \
     --node <node> --vmid 200 --name ctrl \
-    --installer-url http://files.mirror.intra/downloads/os/autoinstall/debian-13.6.0-amd64-netinst-autoinstall.iso \
+    --installer images/debian/dist/debian-13.6.0-amd64-netinst-autoinstall.iso \
     --ciuser ansible --ssh-key ~/.ssh/id_ed25519.pub \
     --ip 192.168.0.156/24 --gw 192.168.0.1 --nameserver 192.168.0.1
 ```
@@ -70,10 +87,10 @@ make image
 `ctrl` shares `192.168.0.0/24` with the fleet; `.156` is the address every
 step below uses.
 
-`--installer-url` has the node fetch the ISO itself. Use
-`--installer images/debian/dist/<file>.iso` instead to upload a build from this
-checkout; the two are mutually exclusive. `make iso` is what produces one, and
-is only needed when the mirror does not already have the ISO.
+`--installer` uploads the ISO to `local` storage once; the next VMs reuse it,
+and `installer_file_id` in `tofu/environments/intra/variables.tf` points at it.
+If the ISO is on a web server the node can reach, `--installer-url <url>` has
+the node download it instead.
 
 ### 3. Check it came up, and tag it
 
@@ -103,6 +120,7 @@ export ANSIBLE_VAULT_PASSWORD_FILE=/work/.vault-pass
 
 export PROXMOX_VE_HOST=192.168.0.155 PROXMOX_VE_USER=root@pam
 export PROXMOX_VE_TOKEN_ID=<id> PROXMOX_VE_TOKEN_SECRET=<secret>
+export FLEET_SUBNET_RE='^192\.168\.0\.'
 
 make controller
 ```

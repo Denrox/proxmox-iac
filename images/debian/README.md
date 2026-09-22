@@ -16,18 +16,18 @@ From the repository root. `make iso` runs in the toolbox and repacks the ISO wit
 
 ```bash
 # once per Debian point release; output goes to images/debian/dist/ (git-ignored)
-make iso BASE=~/Downloads/debian-13.6.0-amd64-netinst.iso EXTRA=--fetch-keys
+curl -fLO https://cdimage.debian.org/cdimage/archive/13.6.0/amd64/iso-cd/debian-13.6.0-amd64-netinst.iso
+make iso BASE=debian-13.6.0-amd64-netinst.iso
 
-# once per machine; the node downloads the ISO itself
+# once per machine; the first run uploads the ISO, later ones reuse it
 export PVE_HOST=192.168.0.155 PVE_TOKEN='PVEAPIToken=root@pam!automation=<secret>'
 ./scripts/pve-provision.sh --insecure --node pve-test --vmid 201 --name web01 \
-    --installer-url http://files.mirror.intra/downloads/os/autoinstall/debian-13.6.0-amd64-netinst-autoinstall.iso \
-    --installer-sha256 <sum> \
+    --installer images/debian/dist/debian-13.6.0-amd64-netinst-autoinstall.iso \
     --ciuser ansible --ssh-key ~/.ssh/id_ed25519.pub \
     --ip 192.168.0.161/24 --gw 192.168.0.1 --nameserver 192.168.0.1
 ```
 
-Use `--installer images/debian/dist/<file>.iso` instead of `--installer-url` to upload a local build. `build-image.sh build --help` lists every option.
+`--installer-url <url>` instead of `--installer` has the node download the ISO from a web server. `build-image.sh build --help` lists every option.
 
 ## Per-machine settings
 
@@ -45,17 +45,17 @@ Kernel arguments `ai.<key>=<value>` override the drive, for manual boots.
 
 ## Built-in settings
 
-Change them in `files/preseed.cfg`, `files/apt/sources.list` or the top of `files/autoinstall/late.sh`, then rebuild and bump `installer_file_id`.
+Change them in `files/preseed.cfg` or the top of `files/autoinstall/late.sh`, then rebuild and bump `installer_file_id`.
 
 * `en_US.UTF-8`, `us` keyboard, `Europe/Kyiv`, NTP on.
-* Packages from `mirror.intra`, never from the install media.
+* Packages from deb.debian.org, never from the install media.
 * Whole disk, ext4 `/` plus swap, no LVM.
 * Root disabled, one sudo user, passwordless sudo when it has no password.
 * `standard`, `ssh-server`, `qemu-guest-agent`, `chrony`, `ufw`, `unattended-upgrades`.
 * sshd: no root login, no password auth when the user has a key.
 * ufw on first boot: deny incoming, allow SSH.
 
-Mirror signing keys: bake them in with `--fetch-keys` or `files/keys/*.asc`, otherwise `late.sh` fetches them during the install.
+Your own mirror: `make iso MIRROR=<host> EXTRA=--fetch-keys` installs from `http://<host>/deb.debian.org/debian` and bakes in its re-signing keys. Without `--fetch-keys` (or `files/keys/*.asc`), `late.sh` fetches them during the install.
 
 ## Gotchas
 

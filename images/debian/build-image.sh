@@ -36,10 +36,11 @@ nameserver, searchdomain), so this image is the same for every machine.
 options:
   --base FILE            Stock Debian netinst ISO to customise   (required)
   --output FILE          Output ISO       (default: dist/<base>-autoinstall.iso)
+  --mirror HOST          Install from a re-signing mirror at http://HOST/<upstream-host>/...
+                         instead of deb.debian.org                  (default: none)
   --keys-dir DIR         Mirror pubkeys (*.asc) to bake in   (default: files/keys)
-  --fetch-keys           Download the mirror pubkeys at build time
-  --key-url-base URL     Pubkey API base
-                         (default: http://admin.mirror.intra/api/pubkey)
+  --fetch-keys           Download the mirror pubkeys at build time (needs --mirror)
+  --key-url-base URL     Pubkey API base    (default: http://admin.HOST/api/pubkey)
   --label NAME           ISO volume label      (default: DEBIAN_AUTOINSTALL)
   --timeout SECONDS      Boot menu timeout before auto-install starts (default: 3)
 
@@ -58,14 +59,30 @@ iso_extract() {
 	xorriso -osirrox on -indev "$1" -extract "$2" "$3" >/dev/null 2>&1
 }
 
+# sources.list for the installed system; a re-signing mirror needs its own keyrings.
+write_sources() {
+	local deb=http://deb.debian.org/debian sec=http://security.debian.org/debian-security
+	local kd='' ks=''
+	if [[ -n $1 ]]; then
+		deb="http://$1/deb.debian.org/debian" sec="http://$1/security.debian.org/debian-security"
+		kd='[signed-by=/etc/apt/keyrings/deb.debian.org.asc] '
+		ks='[signed-by=/etc/apt/keyrings/security.debian.org.asc] '
+	fi
+	printf 'deb %s%s trixie main non-free-firmware\n' "$kd" "$deb"
+	printf 'deb %s%s trixie-security main non-free-firmware\n' "$ks" "$sec"
+	printf 'deb %s%s trixie-updates main non-free-firmware\n' "$kd" "$deb"
+	printf 'deb %s%s trixie-backports main non-free-firmware\n' "$kd" "$deb"
+}
+
 cmd_build() {
 	local base='' output='' keys_dir="$FILES_DIR/keys" fetch_keys=0
-	local key_url_base='http://admin.mirror.intra/api/pubkey'
+	local mirror='' key_url_base=''
 	local label='DEBIAN_AUTOINSTALL' timeout=3
 
 	while (($#)); do
 		case $1 in
 		--base) base=${2:?}; shift 2 ;;
+		--mirror) mirror=${2:?}; shift 2 ;;
 		--output) output=${2:?}; shift 2 ;;
 		--keys-dir) keys_dir=${2:?}; shift 2 ;;
 		--fetch-keys) fetch_keys=1; shift ;;
@@ -78,6 +95,11 @@ cmd_build() {
 	done
 
 	[[ -n $base ]] || die "--base is required"
+	if [[ -n $mirror ]]; then
+		[[ -n $key_url_base ]] || key_url_base="http://admin.$mirror/api/pubkey"
+	elif ((fetch_keys)); then
+		die "--fetch-keys needs --mirror"
+	fi
 	[[ -f $base ]] || die "base image '$base' not found"
 	need_cmd xorriso "apt install xorriso"
 
@@ -108,8 +130,19 @@ cmd_build() {
 	cp "$FILES_DIR/autoinstall/common.sh" \
 		"$FILES_DIR/autoinstall/early.sh" \
 		"$FILES_DIR/autoinstall/late.sh" "$stage/autoinstall/"
-	cp "$FILES_DIR/apt/sources.list" "$stage/autoinstall/apt/sources.list"
+	write_sources "$mirror" >"$stage/autoinstall/apt/sources.list"
 	chmod 0755 "$stage/autoinstall"/*.sh
+	if [[ -n $mirror ]]; then
+		sed -i \
+			-e "s|^d-i mirror/http/hostname string .*|d-i mirror/http/hostname string $mirror|" \
+			-e "s|^d-i mirror/http/directory string .*|d-i mirror/http/directory string /deb.debian.org/debian|" \
+			-e "s|^d-i debian-installer/allow_unauthenticated boolean .*|d-i debian-installer/allow_unauthenticated boolean true|" \
+			"$stage/preseed.cfg"
+		printf "MIRROR_KEY_URL_BASE='%s'\n" "$key_url_base" >"$stage/autoinstall/mirror.env"
+		info "mirror: $mirror"
+	else
+		info "mirror: deb.debian.org"
+	fi
 
 	local key_count=0 host
 	if [[ -d $keys_dir ]]; then
@@ -136,7 +169,7 @@ cmd_build() {
 			fi
 		done
 	fi
-	if ((key_count == 0)); then
+	if [[ -n $mirror ]] && ((key_count == 0)); then
 		warn "no mirror signing keys bundled - the installed system will try to"
 		warn "fetch them from $key_url_base during the install."
 		warn "Drop them into $keys_dir or re-run with --fetch-keys from a host"

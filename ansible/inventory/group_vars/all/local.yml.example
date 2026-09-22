@@ -7,3 +7,7 @@ human_users:
       - "ssh-ed25519 AAAA... you@workstation"
 
 controller_semaphore_admin_email: "admin@example.com"
+
+# Only with your own apt mirror; the defaults are download.docker.com.
+# docker_apt_url: http://mirror.example/download.docker.com/linux/debian
+# docker_apt_key_url: http://mirror.example/pubkey/download.docker.com
