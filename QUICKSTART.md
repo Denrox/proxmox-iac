@@ -1,7 +1,6 @@
 # Quickstart
 
 Fill in `<node>`, `<vmid>`, `<uuid>`, `<secret>`, `<pw>`, `<pass>`.
-Longer explanations of every step are in [README.md](README.md).
 
 ### 0. Prerequisites
 
