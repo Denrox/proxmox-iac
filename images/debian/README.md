@@ -12,7 +12,7 @@ Proxmox VM:  ide2 = installer   ide3 = cloud-init drive   →  start  →  done
 
 ## Quick start
 
-From the repository root, inside the toolbox. Nothing runs as root, the ISO is repacked, not mounted.
+From the repository root. `make iso` runs in the toolbox and repacks the ISO without root.
 
 ```bash
 # once per Debian point release; output goes to images/debian/dist/ (git-ignored)
